@@ -10,6 +10,4 @@ keywords = ["ProfileStore", "Roblox"]
 files = ["src"]
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
-
-[dev-dependencies]
-Signal = "ptekspy/signal@1.1.1"
+exclude = ["scripts"]

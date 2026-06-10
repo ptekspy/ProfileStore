@@ -179,7 +179,6 @@ export type ProfileStore<T> = {
 export type ConstantName = Types.ConstantName
 export type ProfileStoreModule = Types.ProfileStoreModule
 
-
 local AUTO_SAVE_PERIOD = 300 -- (Seconds) Time between when changes to a profile are saved to the DataStore
 local LOAD_REPEAT_PERIOD = 10 -- (Seconds) Time between successive profile reads when handling a session conflict
 local FIRST_LOAD_REPEAT = 5 -- (Seconds) Time between first and second profile read when handling a session conflict
@@ -230,17 +229,17 @@ local MockFlag = false
 local OnError = Signal.New() -- (message, store_name, profile_key)
 local OnOverwrite = Signal.New() -- (store_name, profile_key)
 
-local UpdateQueue = { -- For stability sake, we won't do UpdateAsync calls for the same key until all previous calls finish
-	--[[
+local UpdateQueue =
+	{ -- For stability sake, we won't do UpdateAsync calls for the same key until all previous calls finish
+		--[[
 		[session_token] = {
 			coroutine, ...
 		},
 		...
 	--]]
-}
+	}
 
 local function WaitInUpdateQueue(session_token) --> next_in_queue()
-
 	local is_first = false
 
 	if UpdateQueue[session_token] == nil then
@@ -263,11 +262,9 @@ local function WaitInUpdateQueue(session_token) --> next_in_queue()
 			UpdateQueue[session_token] = nil
 		end
 	end
-
 end
 
 local function SessionToken(store_name, profile_key, is_mock)
-
 	local session_token = "L_" -- Live
 
 	if is_mock == true then
@@ -279,7 +276,6 @@ local function SessionToken(store_name, profile_key, is_mock)
 	session_token ..= store_name .. "\0" .. profile_key
 
 	return session_token
-
 end
 
 local function DeepCopyTable(t)
@@ -322,7 +318,6 @@ local function RegisterOverwrite(store_name, profile_key) -- Called when a corru
 end
 
 local function NewMockDataStoreKeyInfo(params)
-
 	local version_id_string = tostring(params.VersionId or 0)
 	local meta_data = params.MetaData or {}
 	local user_ids = params.UserIds or {}
@@ -330,9 +325,14 @@ local function NewMockDataStoreKeyInfo(params)
 	return {
 		CreatedTime = params.CreatedTime,
 		UpdatedTime = params.UpdatedTime,
-		Version = string.rep("0", 16) .. "."
-			.. string.rep("0", 10 - string.len(version_id_string)) .. version_id_string
-			.. "." .. string.rep("0", 16) .. "." .. "01",
+		Version = string.rep("0", 16)
+			.. "."
+			.. string.rep("0", 10 - string.len(version_id_string))
+			.. version_id_string
+			.. "."
+			.. string.rep("0", 16)
+			.. "."
+			.. "01",
 
 		GetMetadata = function()
 			return DeepCopyTable(meta_data)
@@ -342,11 +342,9 @@ local function NewMockDataStoreKeyInfo(params)
 			return DeepCopyTable(user_ids)
 		end,
 	}
-
 end
 
 local function MockUpdateAsync(mock_data_store, profile_store_name, key, transform_function, is_get_call) --> loaded_data, key_info
-
 	local profile_store = mock_data_store[profile_store_name]
 
 	if profile_store == nil then
@@ -390,7 +388,6 @@ local function MockUpdateAsync(mock_data_store, profile_store_name, key, transfo
 
 		return DeepCopyTable(transform), mock_entry ~= nil and NewMockDataStoreKeyInfo(mock_entry) or nil
 	end
-
 end
 
 local function UpdateAsync(profile_store, profile_key, transform_params, is_user_mock, is_get_call, version) --> loaded_data, key_info
@@ -408,24 +405,21 @@ local function UpdateAsync(profile_store, profile_key, transform_params, is_user
 
 	local success, error_message = pcall(function()
 		local transform_function = function(latest_data)
-
 			local missing_profile = false
 			local overwritten = false
-			local global_updates = {0, {}}
+			local global_updates = { 0, {} }
 
 			if latest_data == nil then
-
 				missing_profile = true
-
 			elseif type(latest_data) ~= "table" then
-
 				missing_profile = true
 				overwritten = true
-
 			else
-
-				if type(latest_data.Data) == "table" and type(latest_data.MetaData) == "table" and type(latest_data.GlobalUpdates) == "table" then
-
+				if
+					type(latest_data.Data) == "table"
+					and type(latest_data.MetaData) == "table"
+					and type(latest_data.GlobalUpdates) == "table"
+				then
 					-- Regular profile structure detected:
 
 					latest_data.WasOverwritten = false -- Must be set to false if set previously
@@ -434,22 +428,20 @@ local function UpdateAsync(profile_store, profile_key, transform_params, is_user
 					if transform_params.ExistingProfileHandle ~= nil then
 						transform_params.ExistingProfileHandle(latest_data)
 					end
-
-				elseif latest_data.Data == nil and latest_data.MetaData == nil and type(latest_data.GlobalUpdates) == "table" then
-
+				elseif
+					latest_data.Data == nil
+					and latest_data.MetaData == nil
+					and type(latest_data.GlobalUpdates) == "table"
+				then
 					-- Regular structure not detected, but GlobalUpdate data exists:
 
 					latest_data.WasOverwritten = false -- Must be set to false if set previously
 					global_updates = latest_data.GlobalUpdates or global_updates
 					missing_profile = true
-
 				else
-
 					missing_profile = true
 					overwritten = true
-
 				end
-
 			end
 
 			-- Profile was not created or corrupted and no GlobalUpdate data exists:
@@ -478,45 +470,36 @@ local function UpdateAsync(profile_store, profile_key, transform_params, is_user
 		end
 
 		if is_user_mock == true then -- Used when the profile is accessed through ProfileStore.Mock
-
-			loaded_data, key_info = MockUpdateAsync(UserMockStore, profile_store.Name, profile_key, transform_function, is_get_call)
+			loaded_data, key_info =
+				MockUpdateAsync(UserMockStore, profile_store.Name, profile_key, transform_function, is_get_call)
 			task.wait() -- Simulate API call yield
-
 		elseif DataStoreState ~= "Access" then -- Used when API access is disabled
-
-			loaded_data, key_info = MockUpdateAsync(MockStore, profile_store.Name, profile_key, transform_function, is_get_call)
+			loaded_data, key_info =
+				MockUpdateAsync(MockStore, profile_store.Name, profile_key, transform_function, is_get_call)
 			task.wait() -- Simulate API call yield
-
 		else
-
 			if is_get_call == true then
-
 				if version ~= nil then
-
 					local success, error_message = pcall(function()
 						loaded_data, key_info = profile_store.data_store:GetVersionAsync(profile_key, version)
 					end)
 
-					if success == false and type(error_message) == "string" and string.find(error_message, "not valid") ~= nil then
+					if
+						success == false
+						and type(error_message) == "string"
+						and string.find(error_message, "not valid") ~= nil
+					then
 						warn(`[{script.Name}]: Passed version argument is not valid; Traceback:\n` .. debug.traceback())
 					end
-
 				else
-
 					loaded_data, key_info = profile_store.data_store:GetAsync(profile_key)
-
 				end
 
 				loaded_data = transform_function(loaded_data)
-
 			else
-
 				loaded_data, key_info = profile_store.data_store:UpdateAsync(profile_key, transform_function)
-
 			end
-
 		end
-
 	end)
 
 	next_in_queue()
@@ -524,24 +507,16 @@ local function UpdateAsync(profile_store, profile_key, transform_params, is_user
 	if success == true and type(loaded_data) == "table" then
 		-- Invalid data handling:
 		if loaded_data.WasOverwritten == true and is_get_call ~= true then
-			RegisterOverwrite(
-				profile_store.Name,
-				profile_key
-			)
+			RegisterOverwrite(profile_store.Name, profile_key)
 		end
 		-- Return loaded_data:
 		return loaded_data, key_info
 	else
 		-- Error handling:
-		RegisterError(
-			error_message or "Undefined error",
-			profile_store.Name,
-			profile_key
-		)
+		RegisterError(error_message or "Undefined error", profile_store.Name, profile_key)
 		-- Return nothing:
 		return nil
 	end
-
 end
 
 local function IsThisSession(session_tag)
@@ -561,7 +536,6 @@ local function WaitForStoreReady(profile_store)
 end
 
 local function AddProfileToAutoSave(profile)
-
 	ActiveSessionCheck[profile.session_token] = profile
 
 	-- Add at AutoSaveIndex and move AutoSaveIndex right:
@@ -574,11 +548,9 @@ local function AddProfileToAutoSave(profile)
 		-- First profile created - make sure it doesn't get immediately auto saved:
 		LastAutoSave = os.clock()
 	end
-
 end
 
 local function RemoveProfileFromAutoSave(profile)
-
 	ActiveSessionCheck[profile.session_token] = nil
 
 	local auto_save_index = table.find(AutoSaveList, profile)
@@ -592,13 +564,13 @@ local function RemoveProfileFromAutoSave(profile)
 			AutoSaveIndex = 1
 		end
 	end
-
 end
 
 local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last_save_reason)
-
 	if type(profile.Data) ~= "table" then
-		error(`[{script.Name}]: Developer code likely set "Profile.Data" to a non-table value! (STORE:{profile.ProfileStore.Name}; KEY:{profile.Key})`)
+		error(
+			`[{script.Name}]: Developer code likely set "Profile.Data" to a non-table value! (STORE:{profile.ProfileStore.Name}; KEY:{profile.Key})`
+		)
 	end
 
 	profile.OnSave:Fire()
@@ -622,89 +594,73 @@ local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last
 	local exp_backoff = 1
 
 	while repeat_save_flag == true do
-
 		if is_ending_session ~= true then
 			repeat_save_flag = false
 		end
 
-		local loaded_data, key_info = UpdateAsync(
-			profile.ProfileStore,
-			profile.Key,
-			{
-				ExistingProfileHandle = nil,
-				MissingProfileHandle = nil,
-				EditProfile = function(latest_data)
+		local loaded_data, key_info = UpdateAsync(profile.ProfileStore, profile.Key, {
+			ExistingProfileHandle = nil,
+			MissingProfileHandle = nil,
+			EditProfile = function(latest_data)
+				-- Check if this session still owns the profile:
 
-					-- Check if this session still owns the profile:
+				local session_owns_profile = false
 
-					local session_owns_profile = false
+				if is_overwriting ~= true then
+					local active_session = latest_data.MetaData.ActiveSession
+					local session_load_count = latest_data.MetaData.SessionLoadCount
+
+					if type(active_session) == "table" then
+						session_owns_profile = IsThisSession(active_session)
+							and session_load_count == profile.load_index
+					end
+				else
+					session_owns_profile = true
+				end
+
+				-- We may only edit the profile if this server has ownership of the profile:
+
+				if session_owns_profile == true then
+					-- Clear processed updates (messages):
+
+					local locked_updates = profile.locked_global_updates -- [index] = true, ...
+					local active_updates = latest_data.GlobalUpdates[2]
+					-- ProfileService module format: {{update_id, version_id, update_locked, update_data}, ...}
+					-- ProfileStore module format: {{update_id, update_data}, ...}
+
+					if next(locked_updates) ~= nil then
+						local i = 1
+						while i <= #active_updates do
+							local update = active_updates[i]
+							if locked_updates[update[1]] == true then
+								table.remove(active_updates, i)
+							else
+								i += 1
+							end
+						end
+					end
+
+					-- Save profile data:
+
+					latest_data.Data = profile.Data
+					latest_data.RobloxMetaData = profile.RobloxMetaData
+					latest_data.UserIds = profile.UserIds
 
 					if is_overwriting ~= true then
+						latest_data.MetaData.LastUpdate = os.time()
 
-						local active_session = latest_data.MetaData.ActiveSession
-						local session_load_count = latest_data.MetaData.SessionLoadCount
-
-						if type(active_session) == "table" then
-							session_owns_profile = IsThisSession(active_session) and session_load_count == profile.load_index
-						end
-
-					else
-						session_owns_profile = true
-					end
-
-					-- We may only edit the profile if this server has ownership of the profile:
-
-					if session_owns_profile == true then
-
-						-- Clear processed updates (messages):
-
-						local locked_updates = profile.locked_global_updates -- [index] = true, ...
-						local active_updates = latest_data.GlobalUpdates[2]
-						-- ProfileService module format: {{update_id, version_id, update_locked, update_data}, ...}
-						-- ProfileStore module format: {{update_id, update_data}, ...}
-
-						if next(locked_updates) ~= nil then
-							local i = 1
-							while i <= #active_updates do
-								local update = active_updates[i]
-								if locked_updates[update[1]] == true then
-									table.remove(active_updates, i)
-								else
-									i += 1
-								end
-							end
-						end
-
-						-- Save profile data:
-
-						latest_data.Data = profile.Data
-						latest_data.RobloxMetaData = profile.RobloxMetaData
-						latest_data.UserIds = profile.UserIds
-
-						if is_overwriting ~= true then
-
-							latest_data.MetaData.LastUpdate = os.time()
-
-							if is_ending_session == true then
-								latest_data.MetaData.ActiveSession = nil
-							end
-
-						else
-
+						if is_ending_session == true then
 							latest_data.MetaData.ActiveSession = nil
-							latest_data.MetaData.ForceLoadSession = nil
-
 						end
-
+					else
+						latest_data.MetaData.ActiveSession = nil
+						latest_data.MetaData.ForceLoadSession = nil
 					end
-
-				end,
-			},
-			profile.is_mock
-		)
+				end
+			end,
+		}, profile.is_mock)
 
 		if loaded_data ~= nil and key_info ~= nil then
-
 			if is_overwriting == true then
 				break
 			end
@@ -768,16 +724,13 @@ local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last
 
 			if session_owns_profile == true then
 				if is_active == true and is_ending_session ~= true then
-
 					-- Processing new global updates (messages):
 
 					for _, update in ipairs(new_updates) do
-
 						local index = update[1]
 						local update_data = update[#update] -- Backwards compatibility with ProfileService
 
 						for _, handler in ipairs(profile.message_handlers) do
-
 							local is_processed = false
 							local processed_callback = function()
 								is_processed = true
@@ -791,14 +744,10 @@ local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last
 							if is_processed == true then
 								break
 							end
-
 						end
-
 					end
-
 				end
 			else
-
 				if profile.roblox_message_subscription ~= nil then
 					profile.roblox_message_subscription:Disconnect()
 				end
@@ -807,23 +756,17 @@ local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last
 					RemoveProfileFromAutoSave(profile)
 					profile.OnSessionEnd:Fire()
 				end
-
 			end
 
 			profile.OnAfterSave:Fire(profile.LastSavedData)
-
 		elseif repeat_save_flag == true then
-
 			-- DataStore call likely resulted in an error; Repeat the DataStore call shortly
 			task.wait(exp_backoff)
 			exp_backoff = math.min(if last_save_reason == "Shutdown" then 8 else 20, exp_backoff * 2)
-
 		end
-
 	end
 
 	ActiveProfileSaveJobs = ActiveProfileSaveJobs - 1
-
 end
 
 ----- Public -----
@@ -860,7 +803,6 @@ local Profile = {}
 Profile.__index = Profile
 
 function Profile.New(raw_data, key_info, profile_store, key, is_mock, session_token)
-
 	local data = raw_data.Data or {}
 	local session = raw_data.MetaData and raw_data.MetaData.ActiveSession or nil
 
@@ -878,7 +820,7 @@ function Profile.New(raw_data, key_info, profile_store, key, is_mock, session_to
 
 		FirstSessionTime = raw_data.MetaData and raw_data.MetaData.ProfileCreateTime or 0,
 		SessionLoadCount = raw_data.MetaData and raw_data.MetaData.SessionLoadCount or 0,
-		Session = session and {PlaceId = session[1], JobId = session[2]},
+		Session = session and { PlaceId = session[1], JobId = session[2] },
 
 		RobloxMetaData = raw_data.RobloxMetaData or {},
 		UserIds = raw_data.UserIds or {},
@@ -900,12 +842,10 @@ function Profile.New(raw_data, key_info, profile_store, key, is_mock, session_to
 		received_global_updates = received_global_updates,
 		message_handlers = {},
 		global_updates = global_updates,
-
 	}
 	setmetatable(self, Profile)
 
 	return self
-
 end
 
 function Profile:IsActive()
@@ -923,9 +863,11 @@ function Profile:EndSession()
 end
 
 function Profile:AddUserId(user_id) -- Associates user_id with profile (GDPR compliance)
-
 	if type(user_id) ~= "number" or user_id % 1 ~= 0 then
-		warn(`[{script.Name}]: Invalid UserId argument for :AddUserId() ({tostring(user_id)}); Traceback:\n` .. debug.traceback())
+		warn(
+			`[{script.Name}]: Invalid UserId argument for :AddUserId() ({tostring(user_id)}); Traceback:\n`
+				.. debug.traceback()
+		)
 		return
 	end
 
@@ -936,13 +878,14 @@ function Profile:AddUserId(user_id) -- Associates user_id with profile (GDPR com
 	if table.find(self.UserIds, user_id) == nil then
 		table.insert(self.UserIds, user_id)
 	end
-
 end
 
 function Profile:RemoveUserId(user_id) -- Removes user_id association with profile (safe function)
-
 	if type(user_id) ~= "number" or user_id % 1 ~= 0 then
-		warn(`[{script.Name}]: Invalid UserId argument for :RemoveUserId() ({tostring(user_id)}); Traceback:\n` .. debug.traceback())
+		warn(
+			`[{script.Name}]: Invalid UserId argument for :RemoveUserId() ({tostring(user_id)}); Traceback:\n`
+				.. debug.traceback()
+		)
 		return
 	end
 
@@ -951,21 +894,17 @@ function Profile:RemoveUserId(user_id) -- Removes user_id association with profi
 	if index ~= nil then
 		table.remove(self.UserIds, index)
 	end
-
 end
 
 function Profile:SetAsync() -- Saves the profile to the DataStore and removes the session lock
-
 	if self.view_mode ~= true then
 		error(`[{script.Name}]: :SetAsync() can only be used in view mode`)
 	end
 
 	SaveProfileAsync(self, nil, true)
-
 end
 
 function Profile:MessageHandler(fn)
-
 	if type(fn) ~= "function" then
 		error(`[{script.Name}]: fn argument is not a function`)
 	end
@@ -978,12 +917,10 @@ function Profile:MessageHandler(fn)
 	table.insert(self.message_handlers, fn)
 
 	for _, update in ipairs(self.global_updates) do
-
 		local index = update[1]
 		local update_data = update[#update] -- Backwards compatibility with ProfileService
 
 		if locked_updates[index] ~= true then
-
 			local processed_callback = function()
 				locked_updates[index] = true
 			end
@@ -991,22 +928,21 @@ function Profile:MessageHandler(fn)
 			local send_update_data = DeepCopyTable(update_data)
 
 			task.spawn(fn, send_update_data, processed_callback)
-
 		end
-
 	end
-
 end
 
 function Profile:Save()
-
 	if self.view_mode == true then
 		error(`[{script.Name}]: Can't save profile in view mode; Should you be calling :SetAsync() instead?`)
 	end
 
 	if self:IsActive() == false then
-		warn(`[{script.Name}]: Attempted saving an inactive profile (STORE:{self.ProfileStore.Name}; KEY:{self.Key});`
-			.. ` Traceback:\n` .. debug.traceback())
+		warn(
+			`[{script.Name}]: Attempted saving an inactive profile (STORE:{self.ProfileStore.Name}; KEY:{self.Key});`
+				.. ` Traceback:\n`
+				.. debug.traceback()
+		)
 		return
 	end
 
@@ -1016,7 +952,6 @@ function Profile:Save()
 
 	-- Perform save in new thread:
 	task.spawn(SaveProfileAsync, self)
-
 end
 
 local ProfileStore: ProfileStoreModule = {
@@ -1027,12 +962,10 @@ local ProfileStore: ProfileStoreModule = {
 	OnOverwrite = OnOverwrite, -- (store_name, profile_key)
 	OnCriticalToggle = Signal.New(), -- (is_critical)
 	DataStoreState = "NotReady", -- ("NotReady", "NoInternet", "NoAccess", "Access")
-
 }
 ProfileStore.__index = ProfileStore
 
 function ProfileStore.SetConstant(name, value)
-
 	if type(value) ~= "number" then
 		error(`[{script.Name}]: Invalid value type`)
 	end
@@ -1060,7 +993,6 @@ function ProfileStore.SetConstant(name, value)
 	else
 		error(`[{script.Name}]: Invalid constant name was provided`)
 	end
-
 end
 
 function ProfileStore.Test()
@@ -1076,7 +1008,6 @@ function ProfileStore.Test()
 end
 
 function ProfileStore.New(store_name, template)
-
 	template = template or {}
 
 	if type(store_name) ~= "string" then
@@ -1117,7 +1048,7 @@ function ProfileStore.New(store_name, template)
 			RemoveAsync = function(_, profile_key)
 				MockFlag = true
 				return self:RemoveAsync(profile_key)
-			end
+			end,
 		},
 
 		Name = store_name,
@@ -1127,49 +1058,42 @@ function ProfileStore.New(store_name, template)
 		load_jobs = {},
 		mock_load_jobs = {},
 		is_ready = true,
-
 	}
 	setmetatable(self, ProfileStore)
 
 	local options = Instance.new("DataStoreOptions")
-	options:SetExperimentalFeatures({v2 = true})
+	options:SetExperimentalFeatures({ v2 = true })
 
 	if DataStoreState == "NotReady" then
-
 		-- The module is not sure whether DataStores are accessible yet:
 
 		self.is_ready = false
 
 		task.spawn(function()
-
-			repeat task.wait() until DataStoreState ~= "NotReady"
+			repeat
+				task.wait()
+			until DataStoreState ~= "NotReady"
 
 			if DataStoreState == "Access" then
 				self.data_store = DataStoreService:GetDataStore(store_name, nil, options)
 			end
 
 			self.is_ready = true
-
 		end)
-
 	elseif DataStoreState == "Access" then
-
 		self.data_store = DataStoreService:GetDataStore(store_name, nil, options)
-
 	end
 
 	return self
-
 end
 
 local function RobloxMessageSubscription(profile, unique_session_id)
-
 	local last_roblox_message = 0
 
 	local roblox_message_subscription = MessagingService:SubscribeAsync("PS_" .. unique_session_id, function(message)
 		if type(message.Data) == "table" and message.Data.LoadCount == profile.SessionLoadCount then
 			-- High reaction rate, based on numPlayers × 10 DataStore budget as of writing
-			if os.clock() - last_roblox_message > 6 then 
+			if os.clock() - last_roblox_message > 6 then
 				last_roblox_message = os.clock()
 				if profile:IsActive() == true then
 					if message.Data.EndSession == true then
@@ -1187,11 +1111,9 @@ local function RobloxMessageSubscription(profile, unique_session_id)
 	else
 		roblox_message_subscription:Disconnect()
 	end
-
 end
 
 function ProfileStore:StartSessionAsync(profile_key, params)
-
 	local is_mock = ReadMockFlag()
 
 	if type(profile_key) ~= "string" then
@@ -1244,7 +1166,6 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 	local exp_backoff = 1
 
 	while ProfileStore.IsClosing == false and cancel_condition() == false do
-
 		-- Load profile:
 
 		-- SPECIAL CASE - If StartSessionAsync is called for the same key again before another StartSessionAsync finishes,
@@ -1260,7 +1181,6 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 		local unique_session_id = HttpService:GenerateGUID(false)
 
 		if profile_load_job ~= nil then
-
 			profile_load_job[1] = load_id -- Steal load job
 			while profile_load_job[2] == nil do -- Wait for job to finish
 				task.wait()
@@ -1272,83 +1192,72 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 				ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
 				return nil
 			end
-
 		else
-
-			profile_load_job = {load_id, nil}
+			profile_load_job = { load_id, nil }
 			profile_load_jobs[profile_key] = profile_load_job
 
-			profile_load_job[2] = table.pack(UpdateAsync(
-				self,
-				profile_key,
-				{
-					ExistingProfileHandle = function(latest_data)
+			profile_load_job[2] = table.pack(UpdateAsync(self, profile_key, {
+				ExistingProfileHandle = function(latest_data)
+					if ProfileStore.IsClosing == true or cancel_condition() == true then
+						return
+					end
 
-						if ProfileStore.IsClosing == true or cancel_condition() == true then
-							return
-						end
+					local active_session = latest_data.MetaData.ActiveSession
+					local force_load_session = latest_data.MetaData.ForceLoadSession
 
-						local active_session = latest_data.MetaData.ActiveSession
-						local force_load_session = latest_data.MetaData.ForceLoadSession
-
-						if active_session == nil then
-							latest_data.MetaData.ActiveSession = {PlaceId, JobId, unique_session_id}
-							latest_data.MetaData.ForceLoadSession = nil
-						elseif type(active_session) == "table" then
-							if IsThisSession(active_session) == false then
-								local last_update = latest_data.MetaData.LastUpdate
-								if last_update ~= nil then
-									if os.time() - last_update > ASSUME_DEAD then
-										latest_data.MetaData.ActiveSession = {PlaceId, JobId, unique_session_id}
-										latest_data.MetaData.ForceLoadSession = nil
-										return
-									end
+					if active_session == nil then
+						latest_data.MetaData.ActiveSession = { PlaceId, JobId, unique_session_id }
+						latest_data.MetaData.ForceLoadSession = nil
+					elseif type(active_session) == "table" then
+						if IsThisSession(active_session) == false then
+							local last_update = latest_data.MetaData.LastUpdate
+							if last_update ~= nil then
+								if os.time() - last_update > ASSUME_DEAD then
+									latest_data.MetaData.ActiveSession = { PlaceId, JobId, unique_session_id }
+									latest_data.MetaData.ForceLoadSession = nil
+									return
 								end
-								if steal_session == true or user_steal == true then
-									local force_load_interrupted = if force_load_session ~= nil then not IsThisSession(force_load_session) else true
-									if force_load_interrupted == false or user_steal == true then
-										latest_data.MetaData.ActiveSession = {PlaceId, JobId, unique_session_id}
-										latest_data.MetaData.ForceLoadSession = nil
-									end
-								elseif request_force_load == true then
-									latest_data.MetaData.ForceLoadSession = {PlaceId, JobId}
-								end
-							else
-								latest_data.MetaData.ForceLoadSession = nil
 							end
+							if steal_session == true or user_steal == true then
+								local force_load_interrupted = if force_load_session ~= nil
+									then not IsThisSession(force_load_session)
+									else true
+								if force_load_interrupted == false or user_steal == true then
+									latest_data.MetaData.ActiveSession = { PlaceId, JobId, unique_session_id }
+									latest_data.MetaData.ForceLoadSession = nil
+								end
+							elseif request_force_load == true then
+								latest_data.MetaData.ForceLoadSession = { PlaceId, JobId }
+							end
+						else
+							latest_data.MetaData.ForceLoadSession = nil
 						end
+					end
+				end,
+				MissingProfileHandle = function(latest_data)
+					local is_cancel = ProfileStore.IsClosing == true or cancel_condition() == true
 
-					end,
-					MissingProfileHandle = function(latest_data)
+					latest_data.Data = DeepCopyTable(self.template)
+					latest_data.MetaData = {
+						ProfileCreateTime = os.time(),
+						SessionLoadCount = 0,
+						ActiveSession = if is_cancel == false then { PlaceId, JobId, unique_session_id } else nil,
+						ForceLoadSession = nil,
+						MetaTags = {}, -- Backwards compatibility with ProfileService
+					}
+				end,
+				EditProfile = function(latest_data)
+					if ProfileStore.IsClosing == true or cancel_condition() == true then
+						return
+					end
 
-						local is_cancel = ProfileStore.IsClosing == true or cancel_condition() == true
-
-						latest_data.Data = DeepCopyTable(self.template)
-						latest_data.MetaData = {
-							ProfileCreateTime = os.time(),
-							SessionLoadCount = 0,
-							ActiveSession = if is_cancel == false then {PlaceId, JobId, unique_session_id} else nil,
-							ForceLoadSession = nil,
-							MetaTags = {}, -- Backwards compatibility with ProfileService
-						}
-
-					end,
-					EditProfile = function(latest_data)
-
-						if ProfileStore.IsClosing == true or cancel_condition() == true then
-							return
-						end
-
-						local active_session = latest_data.MetaData.ActiveSession
-						if active_session ~= nil and IsThisSession(active_session) == true then
-							latest_data.MetaData.SessionLoadCount = latest_data.MetaData.SessionLoadCount + 1
-							latest_data.MetaData.LastUpdate = os.time()
-						end
-
-					end,
-				},
-				is_mock
-				))
+					local active_session = latest_data.MetaData.ActiveSession
+					if active_session ~= nil and IsThisSession(active_session) == true then
+						latest_data.MetaData.SessionLoadCount = latest_data.MetaData.SessionLoadCount + 1
+						latest_data.MetaData.LastUpdate = os.time()
+					end
+				end,
+			}, is_mock))
 			if profile_load_job[1] == load_id then -- Load job hasn't been stolen
 				loaded_data, key_info = table.unpack(profile_load_job[2])
 				profile_load_jobs[profile_key] = nil
@@ -1363,19 +1272,15 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 		if loaded_data ~= nil and key_info ~= nil then
 			local active_session = loaded_data.MetaData.ActiveSession
 			if type(active_session) == "table" then
-
 				if IsThisSession(active_session) == true then
-
 					-- Profile is now taken by this session:
 
 					local profile = Profile.New(loaded_data, key_info, self, profile_key, is_mock, session_token)
 					AddProfileToAutoSave(profile)
 
 					if is_mock ~= true and DataStoreState == "Access" then
-
 						-- Use MessagingService to quickly detect session conflicts and resolve them quickly:
 						task.spawn(RobloxMessageSubscription, profile, unique_session_id) -- Blocking prevention
-
 					end
 
 					if ProfileStore.IsClosing == true or cancel_condition() == true then
@@ -1386,9 +1291,7 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 
 					ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
 					return profile
-
 				else
-
 					if ProfileStore.IsClosing == true or cancel_condition() == true then
 						ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
 						return nil
@@ -1397,10 +1300,11 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 					-- Profile is taken by some other session:
 
 					local force_load_session = loaded_data.MetaData.ForceLoadSession
-					local force_load_interrupted = if force_load_session ~= nil then not IsThisSession(force_load_session) else true
+					local force_load_interrupted = if force_load_session ~= nil
+						then not IsThisSession(force_load_session)
+						else true
 
 					if force_load_interrupted == false then
-
 						if request_force_load == false then
 							force_load_steps = force_load_steps + 1
 							if force_load_steps >= math.ceil(SESSION_STEAL / LOAD_REPEAT_PERIOD) then
@@ -1411,13 +1315,20 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 						-- Request the remote server to end its session:
 						if type(active_session[3]) == "string" then
 							local session_load_count = loaded_data.MetaData.SessionLoadCount or 0
-							task.spawn(MessagingService.PublishAsync, MessagingService, "PS_" .. active_session[3], {LoadCount = session_load_count, EndSession = true})
+							task.spawn(
+								MessagingService.PublishAsync,
+								MessagingService,
+								"PS_" .. active_session[3],
+								{ LoadCount = session_load_count, EndSession = true }
+							)
 						end
 
 						-- Attempt to load the profile again after a delay
-						local wait_until = os.clock() + if request_force_load == true then FIRST_LOAD_REPEAT else LOAD_REPEAT_PERIOD
-						repeat task.wait() until os.clock() >= wait_until or ProfileStore.IsClosing == true
-
+						local wait_until = os.clock()
+							+ if request_force_load == true then FIRST_LOAD_REPEAT else LOAD_REPEAT_PERIOD
+						repeat
+							task.wait()
+						until os.clock() >= wait_until or ProfileStore.IsClosing == true
 					else
 						-- Another session tried to load this profile:
 						ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
@@ -1425,15 +1336,12 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 					end
 
 					request_force_load = false -- Only request a force load once
-
 				end
-
 			else
 				ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
 				return nil -- In this scenario it is likely that this server started shutting down
 			end
 		else
-
 			-- A DataStore call has likely ended in an error:
 
 			local default_timeout = false
@@ -1447,20 +1355,16 @@ function ProfileStore:StartSessionAsync(profile_key, params)
 				return nil
 			end
 
-			task.wait(exp_backoff)  -- Repeat the call shortly
+			task.wait(exp_backoff) -- Repeat the call shortly
 			exp_backoff = math.min(20, exp_backoff * 2)
-
 		end
-
 	end
 
 	ActiveProfileLoadJobs = ActiveProfileLoadJobs - 1
 	return nil -- Game started shutting down or the request was cancelled - don't return the profile
-
 end
 
 function ProfileStore:MessageAsync(profile_key, message)
-
 	local is_mock = ReadMockFlag()
 
 	if type(profile_key) ~= "string" then
@@ -1484,81 +1388,67 @@ function ProfileStore:MessageAsync(profile_key, message)
 	local exp_backoff = 1
 
 	while ProfileStore.IsClosing == false do
-
 		-- Updating profile:
 
-		local loaded_data = UpdateAsync(
-			self,
-			profile_key,
-			{
-				ExistingProfileHandle = nil,
-				MissingProfileHandle = nil,
-				EditProfile = function(latest_data)
+		local loaded_data = UpdateAsync(self, profile_key, {
+			ExistingProfileHandle = nil,
+			MissingProfileHandle = nil,
+			EditProfile = function(latest_data)
+				local global_updates = latest_data.GlobalUpdates
+				local update_list = global_updates[2]
+				--{
+				--	update_index,
+				--	{
+				--		{update_index, data}, ...
+				--	},
+				--},
 
-					local global_updates = latest_data.GlobalUpdates
-					local update_list = global_updates[2]
-					--{
-					--	update_index,
-					--	{
-					--		{update_index, data}, ...
-					--	},
-					--},
+				global_updates[1] += 1
+				table.insert(update_list, { global_updates[1], message })
 
-					global_updates[1] += 1
-					table.insert(update_list, {global_updates[1], message})
+				-- Clearing queue if above limit:
 
-					-- Clearing queue if above limit:
-
-					while #update_list > MAX_MESSAGE_QUEUE do
-						table.remove(update_list, 1)
-					end
-
-				end,
-			},
-			is_mock
-		)
+				while #update_list > MAX_MESSAGE_QUEUE do
+					table.remove(update_list, 1)
+				end
+			end,
+		}, is_mock)
 
 		if loaded_data ~= nil then
-
 			local session_token = SessionToken(self.Name, profile_key, is_mock)
 
 			local profile = ActiveSessionCheck[session_token]
 
 			if profile ~= nil then
-
 				-- The message was sent to a profile that is active in this server:
 				profile:Save()
-
 			else
-
 				local meta_data = loaded_data.MetaData or {}
 				local active_session = meta_data.ActiveSession
 				local session_load_count = meta_data.SessionLoadCount or 0
 
 				if type(active_session) == "table" and type(active_session[3]) == "string" then
 					-- Request the remote server to auto-save sooner and receive the message:
-					task.spawn(MessagingService.PublishAsync, MessagingService, "PS_" .. active_session[3], {LoadCount = session_load_count})
+					task.spawn(
+						MessagingService.PublishAsync,
+						MessagingService,
+						"PS_" .. active_session[3],
+						{ LoadCount = session_load_count }
+					)
 				end
-
 			end
 
 			return true
-
 		else
-
 			task.wait(exp_backoff) -- A DataStore call has likely ended in an error - repeat the call shortly
 			exp_backoff = math.min(20, exp_backoff * 2)
-
 		end
-
 	end
 
 	return false
-
 end
 
 function ProfileStore:GetAsync(profile_key, version)
-
 	local is_mock = ReadMockFlag()
 
 	if type(profile_key) ~= "string" then
@@ -1582,7 +1472,6 @@ function ProfileStore:GetAsync(profile_key, version)
 	local exp_backoff = 1
 
 	while ProfileStore.IsClosing == false do
-
 		-- Load profile:
 
 		local loaded_data, key_info = UpdateAsync(
@@ -1591,7 +1480,6 @@ function ProfileStore:GetAsync(profile_key, version)
 			{
 				ExistingProfileHandle = nil,
 				MissingProfileHandle = function(latest_data)
-
 					latest_data.Data = DeepCopyTable(self.template)
 					latest_data.MetaData = {
 						ProfileCreateTime = os.time(),
@@ -1600,7 +1488,6 @@ function ProfileStore:GetAsync(profile_key, version)
 						ForceLoadSession = nil,
 						MetaTags = {}, -- Backwards compatibility with ProfileService
 					}
-
 				end,
 				EditProfile = nil,
 			},
@@ -1612,7 +1499,6 @@ function ProfileStore:GetAsync(profile_key, version)
 		-- Handle load_data:
 
 		if loaded_data ~= nil then
-
 			if key_info == nil then
 				return nil -- Load was successful, but the key was empty - return no profile object
 			end
@@ -1621,22 +1507,16 @@ function ProfileStore:GetAsync(profile_key, version)
 			profile.view_mode = true
 
 			return profile
-
 		else
-
 			task.wait(exp_backoff) -- A DataStore call has likely ended in an error - repeat the call shortly
 			exp_backoff = math.min(20, exp_backoff * 2)
-
 		end
-
 	end
 
 	return nil -- Game started shutting down - don't return the profile
-
 end
 
 function ProfileStore:RemoveAsync(profile_key)
-
 	local is_mock = ReadMockFlag()
 
 	if type(profile_key) ~= "string" or string.len(profile_key) == 0 then
@@ -1654,7 +1534,6 @@ function ProfileStore:RemoveAsync(profile_key)
 	local next_in_queue = WaitInUpdateQueue(SessionToken(self.Name, profile_key, is_mock))
 
 	if is_mock == true then -- Used when the profile is accessed through ProfileStore.Mock
-
 		local mock_data_store = UserMockStore[self.Name]
 
 		if mock_data_store ~= nil then
@@ -1666,9 +1545,7 @@ function ProfileStore:RemoveAsync(profile_key)
 
 		wipe_status = true
 		task.wait() -- Simulate API call yield
-
 	elseif DataStoreState ~= "Access" then -- Used when API access is disabled
-
 		local mock_data_store = MockStore[self.Name]
 
 		if mock_data_store ~= nil then
@@ -1680,26 +1557,21 @@ function ProfileStore:RemoveAsync(profile_key)
 
 		wipe_status = true
 		task.wait() -- Simulate API call yield
-
 	else -- Live DataStore
-
 		wipe_status = pcall(function()
 			self.data_store:RemoveAsync(profile_key)
 		end)
-
 	end
 
 	next_in_queue()
 
 	return wipe_status
-
 end
 
 local ProfileVersionQuery = {}
 ProfileVersionQuery.__index = ProfileVersionQuery
 
 function ProfileVersionQuery.New(profile_store, profile_key, sort_direction, min_date, max_date, is_mock)
-
 	local self = {
 		profile_store = profile_store,
 		profile_key = profile_key,
@@ -1719,12 +1591,10 @@ function ProfileVersionQuery.New(profile_store, profile_key, sort_direction, min
 	setmetatable(self, ProfileVersionQuery)
 
 	return self
-
 end
 
 function MoveVersionQueryQueue(self) -- Hidden ProfileVersionQuery method
 	while #self.query_queue > 0 do
-
 		local queue_entry = table.remove(self.query_queue, 1)
 
 		task.spawn(queue_entry)
@@ -1732,7 +1602,6 @@ function MoveVersionQueryQueue(self) -- Hidden ProfileVersionQuery method
 		if self.is_query_yielded == true then
 			break
 		end
-
 	end
 end
 
@@ -1740,7 +1609,6 @@ local VersionQueryNextAsyncStackingFlag = false
 local WarnAboutVersionQueryOnce = false
 
 function ProfileVersionQuery:NextAsync()
-
 	local is_stacking = VersionQueryNextAsyncStackingFlag == true
 	VersionQueryNextAsyncStackingFlag = false
 
@@ -1762,7 +1630,6 @@ function ProfileVersionQuery:NextAsync()
 	local is_finished = false
 
 	local function query_job()
-
 		if self.query_failure == true then
 			is_finished = true
 			return
@@ -1771,7 +1638,6 @@ function ProfileVersionQuery:NextAsync()
 		-- First "next" call loads version pages:
 
 		if self.query_pages == nil then
-
 			self.is_query_yielded = true
 
 			task.spawn(function()
@@ -1800,7 +1666,6 @@ function ProfileVersionQuery:NextAsync()
 			MoveVersionQueryQueue(self)
 
 			return
-
 		end
 
 		local current_page = self.query_pages:GetCurrentPage()
@@ -1816,7 +1681,6 @@ function ProfileVersionQuery:NextAsync()
 		-- Load next page when this page is over:
 
 		if next_item == nil then
-
 			self.is_query_yielded = true
 			task.spawn(function()
 				VersionQueryNextAsyncStackingFlag = true
@@ -1837,7 +1701,6 @@ function ProfileVersionQuery:NextAsync()
 			MoveVersionQueryQueue(self)
 
 			return
-
 		end
 
 		-- Next page item:
@@ -1845,7 +1708,6 @@ function ProfileVersionQuery:NextAsync()
 		self.query_index += 1
 		profile = self.profile_store:GetAsync(self.profile_key, next_item.Version)
 		is_finished = true
-
 	end
 
 	if self.is_query_yielded == false then
@@ -1863,11 +1725,9 @@ function ProfileVersionQuery:NextAsync()
 	end
 
 	return profile
-
 end
 
 function ProfileStore:VersionQuery(profile_key, sort_direction, min_date, max_date)
-
 	local is_mock = ReadMockFlag()
 
 	if type(profile_key) ~= "string" or string.len(profile_key) == 0 then
@@ -1876,8 +1736,10 @@ function ProfileStore:VersionQuery(profile_key, sort_direction, min_date, max_da
 
 	-- Type check:
 
-	if sort_direction ~= nil and (typeof(sort_direction) ~= "EnumItem"
-		or sort_direction.EnumType ~= Enum.SortDirection) then
+	if
+		sort_direction ~= nil
+		and (typeof(sort_direction) ~= "EnumItem" or sort_direction.EnumType ~= Enum.SortDirection)
+	then
 		error(`[{script.Name}]: Invalid sort_direction ({tostring(sort_direction)})`)
 	end
 
@@ -1893,15 +1755,12 @@ function ProfileStore:VersionQuery(profile_key, sort_direction, min_date, max_da
 	max_date = typeof(max_date) == "DateTime" and max_date.UnixTimestampMillis or max_date
 
 	return ProfileVersionQuery.New(self, profile_key, sort_direction, min_date, max_date, is_mock)
-
 end
 
 -- DataStore API access check:
 
 if IsStudio == true then
-
 	task.spawn(function()
-
 		local new_state = "NoAccess"
 
 		local status, message = pcall(function()
@@ -1915,11 +1774,14 @@ if IsStudio == true then
 			warn(`[{script.Name}]: No internet access - check your network connection`)
 		end
 
-		if status == false and
-			(string.find(message, "403", 1, true) ~= nil or -- Cannot write to DataStore from studio if API access is not enabled
-				string.find(message, "must publish", 1, true) ~= nil or -- Game must be published to access live keys
-				no_internet_access == true) then -- No internet access
-
+		if
+			status == false
+			and (
+				string.find(message, "403", 1, true) ~= nil -- Cannot write to DataStore from studio if API access is not enabled
+				or string.find(message, "must publish", 1, true) ~= nil -- Game must be published to access live keys
+				or no_internet_access == true
+			)
+		then -- No internet access
 			new_state = if no_internet_access == true then "NoInternet" else "NoAccess"
 			print(`[{script.Name}]: Roblox API services unavailable - data will not be saved`)
 		else
@@ -1929,20 +1791,15 @@ if IsStudio == true then
 
 		DataStoreState = new_state
 		ProfileStore.DataStoreState = new_state
-
 	end)
-
 else
-
 	DataStoreState = "Access"
 	ProfileStore.DataStoreState = "Access"
-
 end
 
 -- Update loop:
 
 RunService.Heartbeat:Connect(function()
-
 	-- Auto saving:
 
 	local auto_save_list_length = #AutoSaveList
@@ -2012,30 +1869,25 @@ RunService.Heartbeat:Connect(function()
 			break
 		end
 	end
-
 end)
 
 -- Release all loaded profiles when the server is shutting down:
 
 task.spawn(function()
-
 	while DataStoreState == "NotReady" do
 		task.wait()
 	end
 
 	if DataStoreState ~= "Access" then
-
 		game:BindToClose(function()
 			ProfileStore.IsClosing = true
 			task.wait() -- Mock shutdown delay
 		end)
 
 		return -- Don't wait for profiles to properly save in mock mode so studio could end the simulation faster
-
 	end
 
 	game:BindToClose(function()
-
 		ProfileStore.IsClosing = true
 
 		-- Release all active profiles:
@@ -2064,9 +1916,7 @@ task.spawn(function()
 		end
 
 		return -- We're done!
-
 	end)
-
 end)
 
 return ProfileStore
