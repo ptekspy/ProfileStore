@@ -1,0 +1,9 @@
+{
+  "name": "ProfileStore",
+  "tree": {
+    "$path": "src",
+    "DevPackages": {
+      "$path": "DevPackages"
+    }
+  }
+}
