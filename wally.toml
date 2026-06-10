@@ -12,4 +12,4 @@ registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
 [dev-dependencies]
-Signal          = "ptekspy/signal@1.1.0"
+Signal = "ptekspy/signal@1.1.1"
